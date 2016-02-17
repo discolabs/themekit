@@ -2,9 +2,9 @@ package commands
 
 import (
 	"encoding/base64"
-	"errors"
 	"fmt"
-	"github.com/csaunders/themekit"
+	"github.com/Shopify/themekit"
+	"github.com/Shopify/themekit/theme"
 	"os"
 	"path/filepath"
 )
@@ -37,7 +37,7 @@ func Download(options DownloadOptions) (done chan bool) {
 	return done
 }
 
-func downloadAllFiles(assets chan themekit.Asset, done chan bool, eventLog chan themekit.ThemeEvent) {
+func downloadAllFiles(assets chan theme.Asset, done chan bool, eventLog chan themekit.ThemeEvent) {
 	for {
 		asset, more := <-assets
 		if more {
@@ -52,7 +52,7 @@ func downloadAllFiles(assets chan themekit.Asset, done chan bool, eventLog chan 
 func downloadFiles(retrievalFunction themekit.AssetRetrieval, filenames []string, done chan bool, eventLog chan themekit.ThemeEvent) {
 	for _, filename := range filenames {
 		if asset, err := retrievalFunction(filename); err != nil {
-			themekit.NotifyError(err)
+			handleError(filename, err, eventLog)
 		} else {
 			writeToDisk(asset, eventLog)
 		}
@@ -61,7 +61,7 @@ func downloadFiles(retrievalFunction themekit.AssetRetrieval, filenames []string
 	return
 }
 
-func writeToDisk(asset themekit.Asset, eventLog chan themekit.ThemeEvent) {
+func writeToDisk(asset theme.Asset, eventLog chan themekit.ThemeEvent) {
 	dir, err := os.Getwd()
 	if err != nil {
 		themekit.NotifyError(err)
@@ -96,7 +96,7 @@ func writeToDisk(asset themekit.Asset, eventLog chan themekit.ThemeEvent) {
 	case len(asset.Attachment) > 0:
 		data, err = base64.StdEncoding.DecodeString(asset.Attachment)
 		if err != nil {
-			themekit.NotifyError(errors.New(fmt.Sprintf("Could not decode %s. error: %s", asset.Key, err)))
+			themekit.NotifyError(fmt.Errorf("Could not decode %s. error: %s", asset.Key, err))
 			return
 		}
 	}
@@ -115,6 +115,26 @@ func writeToDisk(asset themekit.Asset, eventLog chan themekit.ThemeEvent) {
 			etype:     "fsevent",
 			Formatter: func(b basicEvent) string {
 				return themekit.GreenText(fmt.Sprintf("Successfully wrote %s to disk", b.Target))
+			},
+		}
+		logEvent(event, eventLog)
+	}
+}
+
+func handleError(filename string, err error, eventLog chan themekit.ThemeEvent) {
+	if nonFatal, ok := err.(themekit.NonFatalNetworkError); ok {
+		event := basicEvent{
+			Title:     "Non-Fatal Network Error",
+			EventType: nonFatal.Verb,
+			Target:    filename,
+			etype:     "fsevent",
+			Formatter: func(b basicEvent) string {
+				return fmt.Sprintf(
+					"[%s] Could not complete %s for %s",
+					themekit.RedText(fmt.Sprintf("%d", nonFatal.Code)),
+					themekit.YellowText(b.EventType),
+					themekit.BlueText(b.Target),
+				)
 			},
 		}
 		logEvent(event, eventLog)

@@ -12,13 +12,14 @@ import (
 	"strings"
 )
 
-const ConfigurationFilename string = "config\\.yml"
+const ConfigurationFilename = "config\\.yml"
 
-var defaultRegexes []*re.Regexp = []*re.Regexp{
-	re.MustCompile(`\.*`),
+var defaultRegexes = []*re.Regexp{
+	re.MustCompile(`\.git/*`),
+	re.MustCompile(`\.DS_Store`),
 }
 
-var defaultGlobs []string = []string{}
+var defaultGlobs = []string{}
 
 type EventFilter struct {
 	filters []*re.Regexp
@@ -108,9 +109,11 @@ func (e EventFilter) MatchesFilter(event string) bool {
 
 func (e EventFilter) String() string {
 	buffer := bytes.NewBufferString(strings.Join(e.globs, "\n"))
+	buffer.WriteString("--- endglobs ---\n")
 	for _, rxp := range e.filters {
 		buffer.WriteString(fmt.Sprintf("%s\n", rxp))
 	}
+	buffer.WriteString("-- done --")
 	return buffer.String()
 }
 

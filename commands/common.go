@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/csaunders/themekit"
+	"github.com/Shopify/themekit"
 )
 
 type BasicOptions struct {
@@ -75,6 +75,25 @@ func extractThemeClient(t *themekit.ThemeClient, args map[string]interface{}) {
 	if *t, ok = args["themeClient"].(themekit.ThemeClient); !ok {
 		themekit.NotifyError(errors.New("themeClient is not of a valid type"))
 	}
+}
+
+func extractThemeClients(args map[string]interface{}) []themekit.ThemeClient {
+	if args["environments"] == nil {
+		return []themekit.ThemeClient{}
+	}
+
+	var ok bool
+	var environments themekit.Environments
+	if environments, ok = args["environments"].(themekit.Environments); !ok {
+		themekit.NotifyError(errors.New("environments is not of a valid type"))
+	}
+	clients := make([]themekit.ThemeClient, len(environments), len(environments))
+	idx := 0
+	for _, configuration := range environments {
+		clients[idx] = themekit.NewThemeClient(configuration)
+		idx++
+	}
+	return clients
 }
 
 func extractEventLog(el *chan themekit.ThemeEvent, args map[string]interface{}) {

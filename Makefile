@@ -4,15 +4,26 @@ all:
 	for subproject in $(SUBPROJECTS); \
 	do \
 		mkdir -p build/development; \
-	  godep go build -o build/development/$${subproject} cmd/$${subproject}/*.go; \
+	  godep go build -o build/development/$${subproject} github.com/Shopify/themekit/cmd/$${subproject}; \
   done
+
+install: 
+	godep go install github.com/Shopify/themekit/cmd/theme 
 
 build:
 	for subproject in $(SUBPROJECTS); \
 	do \
 	  mkdir -p build/dist/${GOOS}-${GOARCH}; \
-		godep go build -o build/dist/${GOOS}-${GOARCH}/$${subproject} cmd/$${subproject}/*.go; \
+		godep go build -o build/dist/${GOOS}-${GOARCH}/$${subproject}${EXT} github.com/Shopify/themekit/cmd/$${subproject}; \
 	done
+
+test:
+	go test \
+	github.com/Shopify/themekit \
+	github.com/Shopify/themekit/atom \
+	github.com/Shopify/themekit/bucket \
+	github.com/Shopify/themekit/commands \
+	github.com/Shopify/themekit/theme
 
 clean:
 	rm -rf build/
@@ -26,8 +37,8 @@ build32:
 	export GOARCH=386; $(MAKE) build
 
 windows:
-	export GOOS=windows; $(MAKE) build64
-	export GOOS=windows; $(MAKE) build32
+	export GOOS=windows; export EXT=.exe; $(MAKE) build64
+	export GOOS=windows; export EXT=.exe; $(MAKE) build32
 
 mac:
 	export GOOS=darwin; $(MAKE) build64
@@ -39,5 +50,7 @@ linux:
 zip:
 	./compress
 
-dist: windows mac linux zip
+upload_to_s3:
+	./release
 
+dist: clean windows mac linux zip upload_to_s3

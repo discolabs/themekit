@@ -1,14 +1,19 @@
-package themekit
+package theme
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
+	"bytes"
+	"image"
+	"image/png"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
 type LoadAssetSuite struct {
@@ -89,7 +94,7 @@ func (s *LoadAssetSuite) TestWhenFileIsADirectory() {
 
 	asset, err := LoadAsset(root, filename)
 	assert.NotNil(s.T(), err, "The error should not be nil if a directory was given to LoadAsset")
-	assert.Equal(s.T(), "File is a directory", err.Error())
+	assert.Equal(s.T(), "LoadAsset: File is a directory", err.Error())
 	assert.False(s.T(), asset.IsValid(), "The asset returned should not be valid")
 }
 
@@ -104,7 +109,7 @@ func (s *LoadAssetSuite) allocateFileInDir(directory, content string) (root, fil
 	}
 
 	if len(content) > 0 {
-		file.Write([]byte(content))
+		file.WriteString(content)
 		file.Sync()
 		file.Seek(0, 0)
 	}
@@ -137,4 +142,30 @@ func (s *LoadAssetSuite) noteAllocatedFile(name string) {
 func TestLoadAssetSuite(t *testing.T) {
 	LoadAsset("foo", "bar")
 	suite.Run(t, new(LoadAssetSuite))
+}
+
+func TestSortListOfAssets(t *testing.T) {
+	input := []Asset{
+		Asset{Key: "assets/ajaxify.js.liquid"},
+		Asset{Key: "assets/ajaxify.js"},
+		Asset{Key: "assets/ajaxify.css"},
+		Asset{Key: "assets/ajaxify.css.liquid"},
+		Asset{Key: "layouts/customers.liquid"},
+	}
+	expected := []Asset{
+		Asset{Key: "assets/ajaxify.css"},
+		Asset{Key: "assets/ajaxify.css.liquid"},
+		Asset{Key: "assets/ajaxify.js"},
+		Asset{Key: "assets/ajaxify.js.liquid"},
+		Asset{Key: "layouts/customers.liquid"},
+	}
+	sort.Sort(ByAsset(input))
+	assert.Equal(t, expected, input)
+}
+
+func BinaryTestData() []byte {
+	img := image.NewRGBA(image.Rect(0, 0, 10, 10))
+	buff := bytes.NewBuffer([]byte{})
+	png.Encode(buff, img)
+	return buff.Bytes()
 }

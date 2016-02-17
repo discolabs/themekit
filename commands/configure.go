@@ -1,13 +1,14 @@
 package commands
 
 import (
-	"errors"
+	"bufio"
 	"fmt"
-	"github.com/csaunders/themekit"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/Shopify/themekit"
 )
 
 type ConfigurationOptions struct {
@@ -43,7 +44,7 @@ func (co ConfigurationOptions) configurationErrors() error {
 	}
 	if len(errs) > 0 {
 		fullPath := filepath.Join(co.Directory, "config.yml")
-		return errors.New(fmt.Sprintf("Cannot create %s!\nErrors:\n%s", fullPath, strings.Join(errs, "\n")))
+		return fmt.Errorf("Cannot create %s!\nErrors:\n%s", fullPath, strings.Join(errs, "\n"))
 	}
 	return nil
 }
@@ -89,10 +90,6 @@ func Configure(options ConfigurationOptions) {
 func AddConfiguration(dir, environment string, config themekit.Configuration) {
 	environmentLocation := filepath.Join(dir, "config.yml")
 	env, err := loadOrInitializeEnvironment(environmentLocation)
-	if err != nil {
-		themekit.NotifyError(err)
-		return
-	}
 	env.SetConfiguration(environment, config)
 
 	err = env.Save(environmentLocation)
@@ -112,6 +109,32 @@ func MigrateConfigurationCommand(args map[string]interface{}) (done chan bool, l
 	close(done)
 	close(log)
 	return
+}
+
+func PrepareConfigurationMigration(dir string) (func() bool, func() error) {
+	environmentLocation := filepath.Join(dir, "config.yml")
+	env, err := loadOrInitializeEnvironment(environmentLocation)
+	if err != nil {
+		themekit.NotifyError(err)
+		return func() bool { return false }, func() error { return err }
+	}
+
+	confirmationFn := func() bool {
+		before, _ := ioutil.ReadFile(environmentLocation)
+		after := env.String()
+		fmt.Println(themekit.YellowText("Compare changes to configuration:"))
+		fmt.Println(themekit.YellowText("Before:\n"), themekit.GreenText(string(before)))
+		fmt.Println(themekit.YellowText("After:\n"), themekit.RedText(after))
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Println(themekit.YellowText("Does this look correct? (y/n)"))
+		text, _ := reader.ReadString('\n')
+		return strings.TrimSpace(text) == "y"
+	}
+
+	saveFn := func() error {
+		return env.Save(environmentLocation)
+	}
+	return confirmationFn, saveFn
 }
 
 func MigrateConfiguration(dir string) error {
